@@ -48,7 +48,7 @@ class Args:
 
     # Algorithm specific arguments
     env_id: str = "HalfCheetah-v4"
-    total_timesteps: int = 10000000  #increased for more exploring
+    total_timesteps: int = 4000000 #increased for more exploring
     learning_rate: float = 3e-4  
     num_envs: int = 16  #increased from just 1
     num_steps: int = 2048  
