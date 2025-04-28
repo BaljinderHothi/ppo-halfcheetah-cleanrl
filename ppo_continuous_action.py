@@ -48,10 +48,10 @@ class Args:
 
     # Algorithm specific arguments
     env_id: str = "HalfCheetah-v4"
-    total_timesteps: int = 10000000  # Increased for better learning
-    learning_rate: float = 3e-4  # Reverted to original for better exploration
-    num_envs: int = 16  # More environments for diverse experience
-    num_steps: int = 2048  # Longer steps per update for better learning
+    total_timesteps: int = 10000000  #increased for more exploring
+    learning_rate: float = 3e-4  
+    num_envs: int = 16  #increased from just 1
+    num_steps: int = 2048  
     anneal_lr: bool = True
     gamma: float = 0.99
     gae_lambda: float = 0.95
@@ -60,10 +60,10 @@ class Args:
     norm_adv: bool = True
     clip_coef: float = 0.2
     clip_vloss: bool = True
-    ent_coef: float = 0.01  # Added entropy to encourage exploration
+    ent_coef: float = 0.01  #added entropy to encourage exploration
     vf_coef: float = 0.5
     max_grad_norm: float = 0.5
-    target_kl: float = 0.015  # Added target KL to prevent policy collapse
+    target_kl: float = 0.015  #added target KL to prevent policy collapse
 
     # to be filled in runtime
     batch_size: int = 0
@@ -95,14 +95,14 @@ def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
     return layer
 
 
-# Enhanced Agent architecture with larger networks and ReLU activation
+#enhanced Agent architecture with larger networks and ReLU activation
 class Agent(nn.Module):
     def __init__(self, envs):
         super().__init__()
         obs_shape = np.array(envs.single_observation_space.shape).prod()
         action_shape = np.prod(envs.single_action_space.shape)
         
-        # Larger critic network with ReLU
+        #larger critic network with ReLU
         self.critic = nn.Sequential(
             layer_init(nn.Linear(obs_shape, 256)),
             nn.ReLU(),
@@ -111,7 +111,7 @@ class Agent(nn.Module):
             layer_init(nn.Linear(256, 1), std=1.0),
         )
         
-        # Larger actor network with ReLU
+        #larger actor network with ReLU
         self.actor_mean = nn.Sequential(
             layer_init(nn.Linear(obs_shape, 256)),
             nn.ReLU(),
@@ -120,7 +120,7 @@ class Agent(nn.Module):
             layer_init(nn.Linear(256, action_shape), std=0.01),
         )
         
-        # Initialize with slightly lower log std for better initial actions
+        
         self.actor_logstd = nn.Parameter(torch.zeros(1, action_shape) - 0.5)
 
     def get_value(self, x):
@@ -183,16 +183,16 @@ if __name__ == "__main__":
     dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
     values = torch.zeros((args.num_steps, args.num_envs)).to(device)
 
-    # Learning rate scheduling
+    
     def get_lr_multiplier(iteration, warmup_iterations=0.05):
         max_iterations = args.num_iterations
         warmup_steps = int(max_iterations * warmup_iterations)
         
         if iteration < warmup_steps:
-            # Linear warmup
+            
             return iteration / warmup_steps
         else:
-            # Cosine annealing
+            
             progress = (iteration - warmup_steps) / (max_iterations - warmup_steps)
             return 0.5 * (1.0 + np.cos(np.pi * progress))
 
@@ -202,11 +202,11 @@ if __name__ == "__main__":
     next_obs = torch.Tensor(next_obs).to(device)
     next_done = torch.zeros(args.num_envs).to(device)
     
-    # Tracking highest return for saving best model
+    #tracking highest return for saving best model
     best_episodic_return = float('-inf')
 
     for iteration in range(1, args.num_iterations + 1):
-        # Annealing the rate if instructed to do so.
+        
         if args.anneal_lr:
             lrnow = args.learning_rate * get_lr_multiplier(iteration)
             optimizer.param_groups[0]["lr"] = lrnow
@@ -216,7 +216,7 @@ if __name__ == "__main__":
             obs[step] = next_obs
             dones[step] = next_done
 
-            # ALGO LOGIC: action logic
+            
             with torch.no_grad():
                 action, logprob, _, value = agent.get_action_and_value(next_obs)
                 values[step] = value.flatten()
@@ -236,13 +236,13 @@ if __name__ == "__main__":
                         writer.add_scalar("charts/episodic_return", episodic_return, global_step)
                         writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
                         
-                        # Save best model
+                        
                         if episodic_return > best_episodic_return:
                             best_episodic_return = float(episodic_return)
                             torch.save(agent.state_dict(), f"best_model.pth")
                             print(f"New best model with return: {best_episodic_return}")
 
-        # bootstrap value if not done
+        
         with torch.no_grad():
             next_value = agent.get_value(next_obs).reshape(1, -1)
             advantages = torch.zeros_like(rewards).to(device)
@@ -258,7 +258,7 @@ if __name__ == "__main__":
                 advantages[t] = lastgaelam = delta + args.gamma * args.gae_lambda * nextnonterminal * lastgaelam
             returns = advantages + values
 
-        # flatten the batch
+        
         b_obs = obs.reshape((-1,) + envs.single_observation_space.shape)
         b_logprobs = logprobs.reshape(-1)
         b_actions = actions.reshape((-1,) + envs.single_action_space.shape)
@@ -266,10 +266,10 @@ if __name__ == "__main__":
         b_returns = returns.reshape(-1)
         b_values = values.reshape(-1)
 
-        # Optimizing the policy and value network
+        
         clipfracs = []
         for epoch in range(args.update_epochs):
-            # Generate random indices to sample different minibatches each time
+            
             b_inds = np.random.permutation(args.batch_size)
             for start in range(0, args.batch_size, args.minibatch_size):
                 end = start + args.minibatch_size
@@ -318,16 +318,16 @@ if __name__ == "__main__":
                 optimizer.step()
 
             if args.target_kl is not None and approx_kl > args.target_kl:
-                # Early stopping if KL divergence is too high
+                
                 print(f"Early stopping at epoch {epoch} due to reaching max kl: {approx_kl:.2f}")
                 break
 
-        # Save model periodically
+        #save the model periodically
         if iteration % 20 == 0:
             torch.save(agent.state_dict(), f"checkpoint_{global_step}.pth")
             print(f"Saved checkpoint at {global_step} steps")
 
-        # Log metrics
+        #log metrics
         y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
         var_y = np.var(y_true)
         explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y
@@ -342,22 +342,22 @@ if __name__ == "__main__":
         writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
         writer.add_scalar("losses/explained_variance", explained_var, global_step)
         
-        # Calculate P(a* | s) metric
+        # for later on: P(a* | s) metric
         with torch.no_grad():
             prob_metric = torch.exp(-b_logprobs.mean())
             writer.add_scalar("charts/action_probability", prob_metric.item(), global_step)
         
         print(f"Iteration: {iteration}/{args.num_iterations}, SPS: {int(global_step / (time.time() - start_time))}, Current best return: {best_episodic_return:.2f}")
 
-    # Save final model
+    
     final_path = f"checkpoint_final.pth"
     torch.save(agent.state_dict(), final_path)
     print(f"Saved final model: {final_path}")
 
-    # Evaluation for 100 episodes and dump data
+    #dump the data
     print("Starting evaluation for 100 episodes...")
     eval_env = gym.make(args.env_id)
-    agent.load_state_dict(torch.load("best_model.pth", map_location=device))  # Load best model instead of final
+    agent.load_state_dict(torch.load("best_model.pth", map_location=device))  
     agent.eval()
     observations, actions_list, rewards_list = [], [], []
     total_rewards = []
