@@ -50,7 +50,7 @@ class Args:
     env_id: str = "HalfCheetah-v4"
     total_timesteps: int = 4000000 #increased for more exploring
     learning_rate: float = 3e-4  
-    num_envs: int = 16  #increased from just 1
+    num_envs: int = 16  #gonna increase this to 32 bc i finished setting up cuda on my new pc, it runs on gpu now >:)
     num_steps: int = 2048  
     anneal_lr: bool = True
     gamma: float = 0.99
@@ -383,3 +383,60 @@ if __name__ == "__main__":
     print(f"Average Evaluation Reward: {np.mean(total_rewards):.2f}")
     np.savez("evaluation_data.npz", observations=np.array(observations), actions=np.array(actions_list), rewards=np.array(rewards_list))
     print("Saved evaluation_data.npz")
+
+    #gonna try to finish the IL portion here
+
+    num_imitations = 15 #this is just a place holder, gonna check to see how the run does in tensorboard and adjust it
+
+    data = np.load("evaluation_data.npz")
+    obs_np = data["observations"]
+    acts_np = data["actions"]
+    #this is to just load the dumped data
+
+    N = obs_np.shape[0]
+    indices = np.arange(N)
+    
+    #here is the imitation loop
+    #loops over epochs, each epoch we shuffle data, slice it into little batches, compute the loss and keep updating I THINK 
+    for epoch in range(1, num_imitations +1):
+        np.random.shuffle(indices)
+
+        for start in range(0, N, args.minibatch_size):
+            mb_idx = indices[start : start + args.minibatch_size]
+            s_batch = torch.tensor(obs_np[mb_idx], dtype=torch.float32).to(device)
+            a_batch = torch.tensor(acts_np[mb_idx], dtype=torch.float32).to(device)
+
+            #now to compute the loss for the minibatches
+            _, logprob, _, _ = agent.get_action_and_value(s_batch, action=a_batch)
+            loss = -logprob.mean()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+
+        #now to do evaluations of the new imiated policy
+        #gonna run a few episodes to measure average reward under supervised policy
+
+        agent.eval()
+        total_reward = []
+        for _ in range(5):
+            obs_e, _ = envs.envs[0].reset()
+            done, ep_ret = False, 0.0
+            while not done:
+                with torch.no_grad():
+                    act, _, _, _ = agent.get_action_and_value(
+                        torch.tensor(obs_e, dtype=torch.float32).unsqueeze(0).to(device)
+                    )
+                obs_e, r, term, trunc, _ = envs.envs[0].step(act.cpu().numpy()[0])
+                ep_ret += r
+                done = term or trunc
+            total_rewards.append(ep_ret)
+        mean_ret = float(np.mean(total_rewards))
+        agent.train()
+
+
+        #now if this all worked properly, this should return properly
+
+        writer.add_scalar("imit/loss",   loss.item(),   epoch)
+        writer.add_scalar("imit/reward", mean_ret,      epoch)
+        print(f"[Imitation] epoch {epoch:2d}  loss {loss.item():.3f}  reward {mean_ret:.1f}")
