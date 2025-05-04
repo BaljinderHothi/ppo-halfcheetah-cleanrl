@@ -48,7 +48,7 @@ class Args:
 
     # Algorithm specific arguments
     env_id: str = "HalfCheetah-v4"
-    total_timesteps: int = 4000000 #increased for more exploring
+    total_timesteps: int = 5000000 #increased for more exploring
     learning_rate: float = 3e-4  
     num_envs: int = 16  #gonna increase this to 32 bc i finished setting up cuda on my new pc, it runs on gpu now >:)
     num_steps: int = 2048  
@@ -386,7 +386,7 @@ if __name__ == "__main__":
 
     #gonna try to finish the IL portion here
 
-    num_imitations = 15 #this is just a place holder, gonna check to see how the run does in tensorboard and adjust it
+    num_imitations = 45 #this is just a place holder, gonna check to see how the run does in tensorboard and adjust it
 
     data = np.load("evaluation_data.npz")
     obs_np = data["observations"]
